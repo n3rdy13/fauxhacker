@@ -2,6 +2,8 @@
 
 A web-based, interactive terminal simulation designed to teach the fundamentals of wireless network security and penetration testing. Built entirely with HTML, CSS, and vanilla JavaScript, this project provides a safe, gamified environment for students to practice using industry-standard cybersecurity tools without the need for virtual machines or physical wireless adapters.
 
+## Click here to play!! https://n3rdy13.github.io/fauxhacker/
+
 ## ⚠️ Disclaimer
 **This is a purely visual simulation.** This application does not interact with your computer's actual network hardware, nor does it send real packets over the air. It is designed strictly for educational purposes to teach the theory and command syntax of wireless security auditing. Always ensure you have explicit, written permission before testing real networks.
 
