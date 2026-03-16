@@ -43,3 +43,4 @@ Because this project is built with vanilla web technologies, there are no depend
 
 1. **Clone the repository:**
    ```bash
+   https://github.com/n3rdy13/fauxhacker.git
