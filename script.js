@@ -38,7 +38,10 @@ const gameState = {
     connected_network: null,       // Tracks active WiFi connection
     flags: {
         reaver_success: false,
-        omnicorp_hacked: false     // Win condition flag
+        handshake_captured: false, // Mission 4 flag
+        cpu_crack_success: false,  // Mission 5 flag
+        gpu_crack_success: false,  // Mission 6 flag
+        omnicorp_hacked: false     // Mission 7 (Win) flag
     },
     interfaces: {
         wlan0: true,
@@ -63,7 +66,7 @@ const gameState = {
             ]
         },
         {
-            bssid: "DE:AD:BE:EF:00:01", ssid: "Cafe_Guest", channel: "11", encryption: "Open", wps: false, password: null,
+            bssid: "1A:2B:3C:4D:5E:6F", ssid: "Cafe_Free_WiFi", channel: "11", encryption: "WPA2", wps: false, password: "password",
             clients: [
                 { mac: "AA:11:BB:22:CC:33", ip: "10.0.0.5", ports: [80, 443] }
             ]
@@ -109,7 +112,22 @@ const missions = [
         check: () => gameState.flags.reaver_success
     },
     {
-        title: "Mission 4: Operation OmniCorp",
+        title: "Mission 4: The Handshake",
+        objective: "Use airodump-ng to target the 'Cafe_Free_WiFi' network (BSSID: 1A:2B:3C:4D:5E:6F) on its specific channel and write the output to a file named 'cafe'.",
+        check: () => gameState.flags.handshake_captured
+    },
+    {
+        title: "Mission 5: CPU Cracking",
+        objective: "Use aircrack-ng to crack your captured 'cafe-01.cap' file using the 'rockyou.txt' wordlist located in /root.",
+        check: () => gameState.flags.cpu_crack_success
+    },
+    {
+        title: "Mission 6: GPU Acceleration",
+        objective: "Modern cracking uses GPUs. We've converted your capture to a hashcat format (cafe.hc22000). Use hashcat -m 22000 to crack it with 'rockyou.txt'.",
+        check: () => gameState.flags.gpu_crack_success
+    },
+    {
+        title: "Mission 7: Operation OmniCorp",
         objective: "The target is OmniCorp_Secure. Spoof your MAC, capture the handshake, crack it using the leaked wordlist, connect to the network, use nmap to locate the mainframe, and SSH into it.",
         check: () => gameState.flags.omnicorp_hacked
     },
@@ -379,6 +397,21 @@ function checkObjectives() {
         printLine("");
         
         gameState.current_mission++;
+        
+        // VFS Pre-loading for Mission 6 (Index 5)
+        if (gameState.current_mission === 5) { 
+            const currentDirNode = getNode(gameState.current_directory);
+            if (currentDirNode && currentDirNode.type === 'dir') {
+                currentDirNode.content['cafe.hc22000'] = {
+                    type: 'file',
+                    bssid: "1A:2B:3C:4D:5E:6F", 
+                    data: "[Converted Hashcat Format Data]"
+                };
+                printColorLine("[SYSTEM] Converted capture file 'cafe.hc22000' has been added to your current directory.", "cyan");
+                printLine("");
+            }
+        }
+
         if (gameState.current_mission < missions.length) {
             cmdMission();
         }
@@ -672,6 +705,12 @@ async function cmdAirodumpNg(args) {
                 };
             }
             handshakeCaptured = true;
+            
+            // Trigger for Mission 4
+            if (write === 'cafe' && bssid.toUpperCase() === "1A:2B:3C:4D:5E:6F") {
+                gameState.flags.handshake_captured = true;
+            }
+            
         } else if (handshakeCaptured) {
             printLine(` [ WPA handshake: ${bssid.toUpperCase()} ]`);
         }
@@ -755,6 +794,11 @@ async function cmdAircrackNg(args) {
                 printLine("");
                 printLine("      Master Key     : 5C 2A 3B 4C 5D 6E 7F 8A 9B 0C 1D 2E 3F 4A 5B 6C");
                 printLine("      Transient Key  : 1A 2B 3C 4D 5E 6F 7A 8B 9C 0D 1E 2F 3A 4B 5C 6D");
+                
+                // Trigger for Mission 5
+                if (capFile === 'cafe-01.cap') {
+                    gameState.flags.cpu_crack_success = true;
+                }
             } else {
                 printLine("                                 KEY NOT FOUND");
             }
@@ -874,6 +918,11 @@ async function cmdHashcat(args) {
                 printLine("Time.Started.....: " + new Date().toTimeString().split(' ')[0]);
                 printLine("Speed.Dev.#1.....:   345.2 kH/s (10.11ms)");
                 printLine("Recovered........: 1/1 (100.00%) Digests");
+                
+                // Trigger for Mission 6
+                if (hashfile === 'cafe.hc22000') {
+                    gameState.flags.gpu_crack_success = true;
+                }
             } else {
                 printLine("Session..........: hashcat");
                 printLine("Status...........: Exhausted");
@@ -935,7 +984,6 @@ async function cmdKismet(args) {
 }
 
 async function cmdNmap(args) {
-    // FIX 1: Corrected array indexes (args[0] is the flag, args[1] is the target)
     const flag = args[0];
     const target = args[1];
 
@@ -949,13 +997,10 @@ async function cmdNmap(args) {
 
     if (flag === '-sn') {
         let found = 0;
-        
-        // FIX 2: Dynamically extract the subnet base (e.g., "10.0.0.0/24" becomes "10.0.0")
         const subnetBase = target.split('.').slice(0, 3).join('.');
 
         for (const net of gameState.networks) {
             for (const client of net.clients) {
-                // Check if the client IP starts with the requested subnet
                 if (client.ip.startsWith(subnetBase)) {
                     printLine(`Nmap scan report for ${client.ip}`);
                     printLine(`Host is up (${(Math.random() * 0.05).toFixed(4)}s latency).`);
@@ -993,7 +1038,7 @@ async function cmdNmap(args) {
             if (port === 80) { service = "http"; version = "Apache httpd 2.4.41"; }
             if (port === 443) { service = "https"; version = "nginx 1.18.0"; }
             if (port === 445) { service = "microsoft-ds"; version = "Samba smbd 4.6.2"; }
-            if (port === 3306) { service = "mysql"; version = "MySQL 5.7.33"; } // Added for OmniCorp
+            if (port === 3306) { service = "mysql"; version = "MySQL 5.7.33"; } 
             if (port === 3389) { service = "ms-wbt-server"; version = "Microsoft Terminal Services"; }
             if (port === 8080) { service = "http-proxy"; version = "Werkzeug/2.0.2 Python/3.9.2"; }
             
