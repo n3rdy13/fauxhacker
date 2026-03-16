@@ -43,4 +43,3 @@ Because this project is built with vanilla web technologies, there are no depend
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/yourusername/retro-hacker-terminal.git
