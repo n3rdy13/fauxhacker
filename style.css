@@ -91,3 +91,92 @@ body, html {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--term-color);
 }
+/* Bootcamp Modal Styles */
+#bootcamp-modal {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(5, 5, 5, 0.95); /* Deep dark background */
+  z-index: 1000; /* Keeps it above the terminal but below scanlines */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.bootcamp-content {
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border: 1px solid var(--term-color);
+  padding: 30px;
+  box-shadow: var(--glow);
+  background-color: #000000;
+}
+
+.bootcamp-content h1 {
+  text-align: center;
+  margin-top: 0;
+  text-shadow: 0 0 8px var(--term-color);
+}
+
+.module {
+  margin-bottom: 20px;
+  padding-left: 15px;
+  border-left: 2px solid #005500;
+}
+
+.module h3 {
+  margin-bottom: 5px;
+  color: #00ff00;
+}
+
+.module p {
+  margin-top: 0;
+  color: #cccccc; /* Slightly dimmed for readability */
+}
+
+.survival-guide {
+  margin-top: 30px;
+  padding: 15px;
+  border: 1px dashed var(--term-color);
+  background-color: rgba(0, 50, 0, 0.2);
+}
+
+.survival-guide h3 {
+  margin-top: 0;
+  text-align: center;
+  color: yellow;
+  text-shadow: 0 0 5px yellow;
+}
+
+.survival-guide ul {
+  list-style-type: square;
+  padding-left: 20px;
+}
+
+.survival-guide li {
+  margin-bottom: 10px;
+}
+
+.bootcamp-footer {
+  margin-top: 40px;
+  text-align: center;
+}
+
+.blink-text {
+  animation: blinker 1.5s linear infinite;
+  font-weight: bold;
+}
+
+@keyframes blinker {
+  50% { opacity: 0; }
+}
+
+/* Utility class to hide the modal via JavaScript */
+.hidden {
+  display: none !important;
+}
