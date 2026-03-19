@@ -3,6 +3,12 @@ const inputField = document.getElementById('command-input');
 const outputArea = document.getElementById('output');
 const terminal = document.getElementById('terminal');
 const promptSpan = document.querySelector('.prompt');
+const bootcampModal = document.getElementById('bootcamp-modal'); // NEW
+
+// Command History & State
+const commandHistory = [];
+let historyIndex = -1;
+let bootcampActive = true;
 
 // Virtual File System (VFS)
 const fileSystem = {
@@ -217,16 +223,72 @@ const lessons = {
         "4. Exploit: 'ssh root@<target_ip>' (Log into the target machine)"
     ]
 };
-
 // --- Helpers ---
-window.onload = async () => {
-    await bootSequence();
-    cmdMission(); 
-    inputField.focus();
+window.onload = () => {
+    // Wait for Enter on the bootcamp screen before booting
+    document.addEventListener('keydown', handleBootcampDismissal);
 };
-document.addEventListener('click', () => inputField.focus());
+
+async function handleBootcampDismissal(e) {
+    if (bootcampActive && e.key === 'Enter') {
+        bootcampActive = false;
+        bootcampModal.classList.add('hidden'); // Hides the overlay
+        document.removeEventListener('keydown', handleBootcampDismissal);
+        
+        await bootSequence();
+        cmdMission(); 
+        inputField.focus();
+    }
+}
+
+document.addEventListener('click', () => {
+    if (!bootcampActive) inputField.focus();
+});
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// --- Audio Engine (Web Audio API) ---
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function playTone(freq, type, duration, vol) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    
+    // Fade out to prevent popping
+    gainNode.gain.setValueAtTime(vol, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    
+    osc.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+}
+
+function playTyping() {
+    // Randomizes pitch slightly for a realistic mechanical clack
+    const pitch = Math.random() * 200 + 400; 
+    playTone(pitch, 'square', 0.05, 0.02);
+}
+
+function playEnter() {
+    playTone(800, 'sine', 0.1, 0.05);
+}
+
+function playSuccess() {
+    // A quick triumphant two-tone chime
+    playTone(400, 'sine', 0.1, 0.05);
+    setTimeout(() => playTone(600, 'sine', 0.3, 0.05), 100);
+}
+
+function playError() {
+    playTone(150, 'sawtooth', 0.3, 0.05);
+}
+
 const generateMac = () => "XX:XX:XX:XX:XX:XX".replace(/X/g, () => "0123456789ABCDEF".charAt(Math.floor(Math.random() * 16)));
 
 function printLine(text, cssClass = 'output-line') {
@@ -405,7 +467,15 @@ function getNode(path) {
 
 // --- Event Listeners ---
 inputField.addEventListener('keydown', async function(e) {
+    if (bootcampActive) return; // Prevent typing while bootcamp is visible
+
+    // Exclude functional keys from making typing sounds
+    if (e.key !== 'Enter' && e.key !== 'Backspace' && e.key !== 'Tab' && e.key !== 'Shift' && !e.key.startsWith('Arrow')) {
+        playTyping();
+    }
+
     if (e.key === 'Enter') {
+        playEnter(); // Play the return beep
         const inputVal = inputField.value.trim();
         inputField.value = '';
         
@@ -415,6 +485,10 @@ inputField.addEventListener('keydown', async function(e) {
             document.dispatchEvent(new KeyboardEvent('keydown', { ctrlKey: true, key: 'c' }));
             return;
         } else if (inputVal !== '') {
+            // Save to Command History
+            commandHistory.push(inputVal);
+            historyIndex = commandHistory.length;
+
             inputField.disabled = true;
             await processCommand(inputVal);
             checkObjectives(); 
@@ -422,6 +496,57 @@ inputField.addEventListener('keydown', async function(e) {
             if (!gameState.process.active) {
                 inputField.disabled = false;
                 inputField.focus();
+            }
+        }
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault(); // Prevent cursor from moving to the start of the line
+        if (historyIndex > 0) {
+            historyIndex--;
+            inputField.value = commandHistory[historyIndex];
+        }
+    } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (historyIndex < commandHistory.length - 1) {
+            historyIndex++;
+            inputField.value = commandHistory[historyIndex];
+        } else {
+            historyIndex = commandHistory.length;
+            inputField.value = '';
+        }
+    } else if (e.key === 'Tab') {
+        e.preventDefault(); // Prevent standard tab navigation
+        const inputVal = inputField.value;
+        const args = inputVal.split(' ');
+        const lastWord = args[args.length - 1];
+
+        // Autocomplete Base Commands
+        if (args.length === 1) {
+            const commands = ['help', 'clear', 'man', 'learn', 'mission', 'pwd', 'ls', 'cd', 'cat', 'rm', 'airmon-ng', 'macchanger', 'airodump-ng', 'aireplay-ng', 'aircrack-ng', 'wash', 'reaver', 'hashcat', 'mdk4', 'kismet', 'nmap', 'connect', 'ssh'];
+            const matches = commands.filter(cmd => cmd.startsWith(lastWord));
+            
+            if (matches.length === 1) {
+                inputField.value = matches[0] + ' ';
+            } else if (matches.length > 1) {
+                printLine(`${promptSpan.textContent} ${inputVal}`);
+                printLine(matches.join('  '));
+                scrollToBottom();
+            }
+        } 
+        // Autocomplete Files/Directories in Current Path
+        else {
+            const currentNode = getNode(gameState.current_directory);
+            if (currentNode && currentNode.type === 'dir') {
+                const files = Object.keys(currentNode.content);
+                const matches = files.filter(f => f.startsWith(lastWord));
+                
+                if (matches.length === 1) {
+                    args[args.length - 1] = matches[0];
+                    inputField.value = args.join(' ') + ' ';
+                } else if (matches.length > 1) {
+                    printLine(`${promptSpan.textContent} ${inputVal}`);
+                    printLine(matches.join('  '));
+                    scrollToBottom();
+                }
             }
         }
     }
@@ -449,6 +574,7 @@ function checkObjectives() {
             return;
         }
 
+        playSuccess(); // Trigger the success chime!
         printColorLine(`
   _     _______     _______ _       ____ ___  __  __ ____  _     _____ _____ _____ 
  | |   | ____\\ \\   / / ____| |     / ___/ _ \\|  \\/  |  _ \\| |   | ____|_   _| ____|
@@ -571,6 +697,7 @@ async function processCommand(input) {
             await cmdSsh(args);
             break;
         default:
+            playError(); // Trigger error sound for bad commands!
             printLine(`bash: ${cmd}: command not found`);
             break;
     }
@@ -683,7 +810,6 @@ function cmdRm(args) {
         printLine(`rm: cannot remove '${args[0]}': No such file or directory`);
     }
 }
-
 // --- Tool Implementations ---
 
 async function cmdAirmonNg(args) {
