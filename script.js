@@ -156,6 +156,68 @@ const manuals = {
     "ssh": "NAME\n  ssh - OpenSSH SSH client (remote login program)\n\nSYNOPSIS\n  ssh <user>@<ip>\n\nDESCRIPTION\n  ssh is a program for logging into a remote machine and for executing commands on a remote machine."
 };
 
+// Educational Learning Modules
+const lessons = {
+    "basics": [
+        "MODULE: Linux Basics & VFS",
+        "Before hacking, you must know how to navigate the system.",
+        " - 'pwd' : Print Working Directory (shows where you are).",
+        " - 'ls'  : List files and folders in your current directory.",
+        " - 'cd <folder>' : Change directory (e.g., 'cd /home/student').",
+        " - 'cat <file>'  : Read the contents of a text file (e.g., 'cat readme.txt').",
+        "",
+        "CRITICAL SHORTCUT: [Ctrl + C]",
+        "Many hacking tools (like airodump-ng or wash) run forever.",
+        "When a tool takes over your screen and you cannot type, press",
+        "Ctrl+C on your keyboard to kill the process and get your prompt back."
+    ],
+    "opsec": [
+        "MODULE: Operational Security (OpSec)",
+        "Every network card has a unique, hardcoded MAC address. If you attack a network",
+        "with your real MAC, you leave a permanent fingerprint.",
+        "TOOL: macchanger",
+        " - Use 'macchanger -r wlan0' to assign a random MAC address to your card.",
+        " - Use 'macchanger -p wlan0' to restore your permanent MAC."
+    ],
+    "recon": [
+        "MODULE: Reconnaissance",
+        "To see hidden WiFi traffic, your card must be in 'monitor mode'.",
+        "1. Enable Monitor Mode: 'airmon-ng start wlan0' (creates 'wlan0mon').",
+        "2. Scan the Airwaves: 'airodump-ng wlan0mon'.",
+        "3. Target a Network: 'airodump-ng -c <channel> --bssid <mac> -w <filename> wlan0mon'.",
+        "   (The '-w' flag writes the captured packets to a file so you can crack them later)."
+    ],
+    "attacks": [
+        "MODULE: Active Attacks",
+        "Sometimes you need to force a device to disconnect so you can capture its handshake",
+        "when it reconnects. This is called a Deauthentication Attack.",
+        "TOOL: aireplay-ng",
+        " - Syntax: 'aireplay-ng -0 <count> -a <router_mac> -c <client_mac> wlan0mon'",
+        "",
+        "Alternatively, some routers have WPS (WiFi Protected Setup) enabled, which is highly vulnerable.",
+        " - Find WPS routers: 'wash -i wlan0mon'",
+        " - Attack WPS PINs: 'reaver -i wlan0mon -b <router_mac> -vv'"
+    ],
+    "cracking": [
+        "MODULE: Cryptographic Cracking",
+        "Once you capture a WPA handshake (.cap file), you must crack it using a wordlist.",
+        "TOOL: aircrack-ng (CPU Cracking)",
+        " - Syntax: 'aircrack-ng -w <wordlist.txt> <capture_file.cap>'",
+        "",
+        "TOOL: hashcat (GPU Cracking)",
+        "Modern cracking uses GPUs. First, .cap files are converted to .hc22000 format.",
+        " - Syntax: 'hashcat -m 22000 <hashfile.hc22000> <wordlist.txt>'"
+    ],
+    "post-exploit": [
+        "MODULE: Post-Exploitation",
+        "Once you have the WiFi password, you can connect and scan the internal network.",
+        "1. Connect: 'connect <SSID> <password>'",
+        "2. Scan for targets: 'nmap -sn 10.0.0.0/24' (Ping sweep to find IPs)",
+        "3. Scan for vulnerabilities: 'nmap -sV <target_ip>' (Find open ports like 22 for SSH)",
+        "4. Exploit: 'ssh root@<target_ip>' (Log into the target machine)"
+    ]
+};
+
 // --- Helpers ---
 window.onload = async () => {
     await bootSequence();
@@ -261,11 +323,11 @@ async function bootSequence() {
     promptSpan.textContent = "";
     
     const banner = `
-   ____  _  _  ____  ____  ____  ____    __    _  _  ___  ____  ___ 
-  / ___)( \\/ )(  _ \\(  __)(  _ \\(  _ \\  /__\\  ( \\( )/ __)(  __)/ __)
-  \\___ \\ \\  /  ) _ < ) _)  )   / )   / /(__)\\  )  (( (_-. ) _) \\__ \\
-  (____/ (__) (____/(____)(_)\\_)(_)\\_)(__)(__)(_)\\_)\\___/(____)(___/
-    
+     ______               __  __           __            
+       / ____/___ ___  __  _/ / / /___ ______/ /_____  _____
+      / /_  / __ \`/ / / / |/_/ /_/ / __ \`/ ___/ //_/ _ \\/ ___/
+     / __/ / /_/ / /_/ />  </ __  / /_/ / /__/ ,< /  __/ /    
+    /_/    \\__,_/\\__,_/_/|_/_/ /_/\\__,_/\\___/_/|_|\\___/_/    
     :: Wireless Security Simulation Environment ::
     :: Kernel 5.18.0-kali5-amd64                ::
     `;
@@ -281,8 +343,11 @@ async function bootSequence() {
     printLine("");
     printColorLine("Welcome, Student.", "cyan");
     printLine("Type 'help' to see a list of available commands.");
-    printLine("Type 'man <command>' to read the manual for a specific tool.");
+    printLine("Type 'learn' for interactive tutorials.");
     printLine("Type 'mission' to review your current objective.");
+    printLine("");
+    printColorLine("IMPORTANT: If a tool runs continuously and you cannot type,", "yellow");
+    printColorLine("press [Ctrl + C] on your keyboard to stop it and return to the prompt.", "yellow");
     printLine("");
     
     updatePrompt();
@@ -378,14 +443,12 @@ function checkObjectives() {
     const m = missions[gameState.current_mission];
     if (m.check()) {
         
-        // Check if it's the final mission
         if (m.title.includes("OmniCorp")) {
             triggerWinSequence();
             gameState.current_mission++;
             return;
         }
 
-        // Standard Mission Complete
         printColorLine(`
   _     _______     _______ _       ____ ___  __  __ ____  _     _____ _____ _____ 
  | |   | ____\\ \\   / / ____| |     / ___/ _ \\|  \\/  |  _ \\| |   | ____|_   _| ____|
@@ -434,9 +497,9 @@ async function processCommand(input) {
             printLine("  Attacks         : aireplay-ng, reaver, mdk4");
             printLine("  Cracking        : aircrack-ng, hashcat");
             printLine("  Post-Exploit    : connect, ssh");
-            printLine("  Game            : mission, clear");
+            printLine("  Game            : mission, learn, clear");
             printLine("");
-            printLine("Tip: Type 'man <command>' to learn how to use a specific tool.");
+            printLine("Tip: Type 'learn' for interactive tutorials, or 'man <command>' for technical manuals.");
             break;
         case 'man':
             if (!args[0]) {
@@ -446,6 +509,9 @@ async function processCommand(input) {
             } else {
                 printLine(`No manual entry for ${args[0]}`);
             }
+            break;
+        case 'learn':
+            cmdLearn(args);
             break;
         case 'mission':
             if (typeof cmdMission === 'function') cmdMission();
@@ -507,6 +573,41 @@ async function processCommand(input) {
         default:
             printLine(`bash: ${cmd}: command not found`);
             break;
+    }
+}
+
+// --- Learning Module Command ---
+function cmdLearn(args) {
+    if (args.length === 0) {
+        printColorLine("=== CYBER SECURITY LEARNING MODULES ===", "cyan");
+        printLine("Type 'learn <module>' to start a lesson.");
+        printLine("");
+        printLine("Available Modules:");
+        printLine("  basics       - Navigating the Linux terminal");
+        printLine("  opsec        - Hiding your identity (MAC Spoofing)");
+        printLine("  recon        - Sniffing wireless traffic");
+        printLine("  attacks      - Deauths and WPS vulnerabilities");
+        printLine("  cracking     - CPU vs GPU password cracking");
+        printLine("  post-exploit - Network scanning and SSH access");
+        return;
+    }
+
+    const moduleName = args[0].toLowerCase();
+    
+    if (lessons[moduleName]) {
+        printColorLine("========================================", "yellow");
+        lessons[moduleName].forEach(line => {
+            if (line.startsWith("MODULE:")) {
+                printColorLine(line, "yellow");
+            } else if (line.startsWith("TOOL:")) {
+                printColorLine(line, "#00ff00"); 
+            } else {
+                printLine(line);
+            }
+        });
+        printColorLine("========================================", "yellow");
+    } else {
+        printLine(`Module '${moduleName}' not found. Type 'learn' to see available modules.`);
     }
 }
 
@@ -666,6 +767,9 @@ async function cmdAirodumpNg(args) {
     let loops = 0;
     let handshakeCaptured = false;
 
+    printColorLine("Starting airodump-ng... (Press Ctrl+C to stop capturing)", "yellow");
+    await sleep(1500); 
+
     while (gameState.process.active) {
         outputArea.innerHTML = ''; 
         printLine(` CH ${channel || '1-11'} ][ Elapsed: ${loops * 2} s ][ ${new Date().toISOString().split('T')[1].split('.')[0]} `);
@@ -817,6 +921,9 @@ async function cmdWash(args) {
     gameState.process.active = true;
     promptSpan.textContent = "";
     
+    printColorLine("Starting wash... (Press Ctrl+C to stop scanning)", "yellow");
+    await sleep(1000);
+
     printLine("BSSID                  Ch  dBm  WPS  Lck  Vendor    ESSID");
     printLine("--------------------------------------------------------------------------------");
 
@@ -952,12 +1059,12 @@ async function cmdMdk4(args) {
     promptSpan.textContent = "";
 
     if (mode === 'd') {
-        printLine("Starting Deauthentication / Disassociation DoS Mode");
+        printColorLine("Starting Deauthentication DoS Mode... (Press Ctrl+C to stop)", "yellow");
         gameState.active_process_interval = setInterval(() => {
             printLine(`Sending Deauth to broadcast MAC from spoofed AP ${generateMac()}`);
         }, 300);
     } else if (mode === 'a') {
-        printLine("Starting Authentication Denial of Service Mode");
+        printColorLine("Starting Authentication DoS Mode... (Press Ctrl+C to stop)", "yellow");
         gameState.active_process_interval = setInterval(() => {
             printLine(`Connecting to AP ${generateMac()} with fake client ${generateMac()}... AP unresponsive`);
         }, 200);
